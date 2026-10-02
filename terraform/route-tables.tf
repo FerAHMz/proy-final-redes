@@ -33,3 +33,11 @@ resource "aws_route_table_association" "private" {
   subnet_id      = each.value
   route_table_id = aws_route_table.private.id
 }
+
+# Tabla principal que AWS crea con la VPC; ninguna subred la usa porque
+# todas tienen asociación explícita. Solo se adopta para nombrarla.
+resource "aws_default_route_table" "main" {
+  default_route_table_id = aws_vpc.main.default_route_table_id
+
+  tags = { Name = "${local.name}-main-rt-unused" }
+}
