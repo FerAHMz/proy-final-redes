@@ -1,0 +1,11 @@
+# Copiar a terraform.tfvars y reemplazar los valores.
+# 203.0.113.10/32 es solo un ejemplo: usar la IP pública real (curl https://checkip.amazonaws.com).
+
+aws_region = "us-east-1"
+admin_cidr = "203.0.113.10/32"
+key_name   = "nombre-keypair"
+
+instance_type = "t3.micro"
+
+datacenter_instance_count = 1
+create_guest_instance     = false
