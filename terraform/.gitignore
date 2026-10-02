@@ -1,0 +1,10 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.pem
+*.key
+*.csv
+terraform.tfvars
+*.tfvars
+!terraform.tfvars.example
+crash.log
