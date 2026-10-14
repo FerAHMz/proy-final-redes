@@ -38,6 +38,14 @@ output "bastion_private_ip" {
   value = aws_instance.bastion.private_ip
 }
 
+output "fw_public_ip" {
+  value = aws_instance.fw.public_ip
+}
+
+output "fw_private_ip" {
+  value = aws_instance.fw.private_ip
+}
+
 output "sales_01_private_ip" {
   value = aws_instance.sales["01"].private_ip
 }

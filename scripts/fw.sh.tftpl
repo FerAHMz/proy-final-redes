@@ -1,0 +1,50 @@
+#!/bin/bash
+# Configura barrilete-fw: reenvío IPv4, NAT (masquerade) y filtrado con nftables.
+set -euxo pipefail
+
+# Reenvío de paquetes entre interfaces
+echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/90-barrilete-fw.conf
+sysctl --system
+
+until dnf install -y nftables; do sleep 10; done
+
+IFACE=$(ip route show default | awk '{print $5; exit}')
+
+cat > /etc/sysconfig/nftables.conf <<EOF
+flush ruleset
+
+table inet filter {
+  # Tráfico dirigido al propio firewall
+  chain input {
+    type filter hook input priority 0; policy drop;
+    ct state established,related accept
+    ct state invalid drop
+    iif lo accept
+    ip saddr ${vpc_cidr} ip protocol icmp accept
+    ip saddr { ${management_cidr}, ${it_cidr} } tcp dport 22 accept
+  }
+
+  # Tráfico de la VPC que sale a Internet
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+    ct state established,related accept
+    ip saddr ${vpc_cidr} ip daddr != ${vpc_cidr} tcp dport { 80, 443 } accept
+    ip saddr ${vpc_cidr} ip daddr != ${vpc_cidr} icmp type echo-request accept
+    limit rate 10/minute log prefix "FW-DROP "
+  }
+
+  chain output {
+    type filter hook output priority 0; policy accept;
+  }
+}
+
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority 100;
+    ip saddr ${vpc_cidr} ip daddr != ${vpc_cidr} oifname "$IFACE" masquerade
+  }
+}
+EOF
+
+systemctl enable nftables
+systemctl restart nftables
