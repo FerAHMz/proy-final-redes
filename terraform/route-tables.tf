@@ -15,9 +15,15 @@ resource "aws_route_table_association" "management" {
   route_table_id = aws_route_table.public.id
 }
 
-# Privada: solo la ruta local de la VPC, sin salida a Internet ni NAT
+# Privada: ruta local + salida a Internet por el firewall (solo salida;
+# desde Internet no hay forma de entrar a estas subredes)
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block           = "0.0.0.0/0"
+    network_interface_id = aws_instance.fw.primary_network_interface_id
+  }
 
   tags = { Name = "${local.name}-private-rt" }
 }
