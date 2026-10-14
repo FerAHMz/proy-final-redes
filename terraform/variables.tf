@@ -52,6 +52,12 @@ variable "management_subnet_cidr" {
   default     = "192.168.10.176/28"
 }
 
+variable "hr_subnet_cidr" {
+  description = "Subred de Recursos Humanos (Fase 2)"
+  type        = string
+  default     = "192.168.10.192/28"
+}
+
 variable "admin_cidr" {
   description = "IP pública del administrador en notación CIDR, se recomienda /32"
   type        = string

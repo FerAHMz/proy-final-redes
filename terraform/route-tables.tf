@@ -28,6 +28,7 @@ resource "aws_route_table_association" "private" {
     guest      = aws_subnet.guest.id
     it         = aws_subnet.it.id
     datacenter = aws_subnet.datacenter.id
+    hr         = aws_subnet.hr.id
   }
 
   subnet_id      = each.value
