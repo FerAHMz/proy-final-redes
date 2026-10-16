@@ -1,0 +1,130 @@
+#!/bin/bash
+# Servidor OpenLDAP de Barrilete (Data Center): LDAPS con la CA del laboratorio,
+# árbol ${base_dn} con los grupos y usuarios de Ventas, RRHH y TI.
+set -euxo pipefail
+
+# Reintenta hasta que el firewall dé salida a Internet
+until dnf install -y openldap-servers openldap-clients; do sleep 10; done
+
+# Certificados generados por Terraform
+set +x  # no imprimir llaves ni contraseñas en el log de arranque
+install -d -m 755 /etc/openldap/tls
+cat > /etc/openldap/tls/ca.crt <<'EOF'
+${ca_cert}
+EOF
+cat > /etc/openldap/tls/ldap.crt <<'EOF'
+${server_cert}
+EOF
+cat > /etc/openldap/tls/ldap.key <<'EOF'
+${server_key}
+EOF
+set -x
+chown root:ldap /etc/openldap/tls/*
+chmod 644 /etc/openldap/tls/ca.crt /etc/openldap/tls/ldap.crt
+chmod 640 /etc/openldap/tls/ldap.key
+
+# En la red solo LDAPS (636); ldapi es el socket local para administrar.
+# La unidad de AL2023 trae los puertos fijos en ExecStart, por eso se reemplaza.
+mkdir -p /etc/systemd/system/slapd.service.d
+cat > /etc/systemd/system/slapd.service.d/10-barrilete.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/usr/sbin/slapd -u ldap -h "ldapi:/// ldaps:///"
+EOF
+systemctl daemon-reload
+systemctl enable --now slapd
+
+# Esquemas para usuarios y grupos POSIX
+for s in cosine nis inetorgperson; do
+  ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/openldap/schema/$s.ldif
+done
+
+set +x  # desde aquí se manejan contraseñas
+ADMIN_HASH=$(slappasswd -s '${admin_password}')
+
+# Base del directorio, administrador y permisos: las contraseñas solo sirven
+# para autenticarse, nadie las puede leer
+ldapmodify -Y EXTERNAL -H ldapi:/// <<EOF
+dn: olcDatabase={2}mdb,cn=config
+changetype: modify
+replace: olcSuffix
+olcSuffix: ${base_dn}
+-
+replace: olcRootDN
+olcRootDN: cn=admin,${base_dn}
+-
+replace: olcRootPW
+olcRootPW: $ADMIN_HASH
+-
+replace: olcAccess
+olcAccess: {0}to attrs=userPassword by self write by anonymous auth by * none
+olcAccess: {1}to * by * read
+EOF
+
+# TLS
+ldapmodify -Y EXTERNAL -H ldapi:/// <<'EOF'
+dn: cn=config
+changetype: modify
+replace: olcTLSCACertificateFile
+olcTLSCACertificateFile: /etc/openldap/tls/ca.crt
+-
+replace: olcTLSCertificateFile
+olcTLSCertificateFile: /etc/openldap/tls/ldap.crt
+-
+replace: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: /etc/openldap/tls/ldap.key
+EOF
+systemctl restart slapd
+
+# Árbol: unidades, grupos y usuarios
+ldapadd -x -H ldapi:/// -D "cn=admin,${base_dn}" -w '${admin_password}' <<EOF
+dn: ${base_dn}
+objectClass: dcObject
+objectClass: organization
+o: Barrilete Ventures
+dc: barrilete
+
+dn: ou=People,${base_dn}
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,${base_dn}
+objectClass: organizationalUnit
+ou: Groups
+
+%{ for g, gid in groups ~}
+dn: cn=${g},ou=Groups,${base_dn}
+objectClass: posixGroup
+cn: ${g}
+gidNumber: ${gid}
+%{ for name, u in users ~}
+%{ if u.group == g ~}
+memberUid: ${name}
+%{ endif ~}
+%{ endfor ~}
+
+%{ endfor ~}
+%{ for name, u in users ~}
+dn: uid=${name},ou=People,${base_dn}
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: ${name}
+cn: ${u.cn}
+sn: ${u.sn}
+uidNumber: ${u.uid}
+gidNumber: ${groups[u.group]}
+homeDirectory: /home/${name}
+loginShell: /bin/bash
+userPassword: $(slappasswd -s '${passwords[name]}')
+
+%{ endfor ~}
+EOF
+
+# Cliente local para pruebas con ldapsearch
+cat >> /etc/openldap/ldap.conf <<'EOF'
+BASE ${base_dn}
+URI ldaps://ldap.barrilete.dev
+TLS_CACERT /etc/openldap/tls/ca.crt
+EOF
+echo "127.0.0.1 ldap.barrilete.dev" >> /etc/hosts

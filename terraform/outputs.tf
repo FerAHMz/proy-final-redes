@@ -73,3 +73,18 @@ output "ssh_bastion_command" {
 output "ssh_sales_01_command" {
   value = "ssh -J ec2-user@${aws_instance.bastion.public_ip} ec2-user@${aws_instance.sales["01"].private_ip}"
 }
+
+output "ldap_private_ip" {
+  value = aws_instance.ldap.private_ip
+}
+
+output "ldap_admin_password" {
+  value     = random_password.ldap_admin.result
+  sensitive = true
+}
+
+output "ldap_user_passwords" {
+  description = "Contraseñas de los usuarios de demostración"
+  value       = { for k, p in random_password.ldap_user : k => p.result }
+  sensitive   = true
+}
