@@ -40,6 +40,18 @@ resource "aws_instance" "sales" {
   associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.sales.id]
   key_name                    = var.key_name
+  user_data_replace_on_change = true
+
+  # Autenticación SSH contra LDAP: entran Ventas y TI
+  user_data = templatefile("${path.module}/../scripts/sssd-client.sh.tftpl", {
+    ca_cert        = tls_self_signed_cert.ca.cert_pem
+    ldap_uri       = local.ldap_uri
+    ldap_ip        = local.ldap_ip
+    base_dn        = local.ldap_base_dn
+    allowed_groups = "ventas-users, ti-admins"
+  })
+
+  depends_on = [aws_route_table.private]
 
   tags = { Name = "${local.name}-sales-${each.key}" }
 }

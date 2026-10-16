@@ -1,0 +1,58 @@
+#!/bin/bash
+# Cliente LDAP con SSSD: solo los grupos permitidos entran por SSH con su
+# contraseña de LDAP. ec2-user (llave EC2) queda únicamente como acceso de rescate.
+set -euxo pipefail
+
+# Reintenta hasta que el firewall dé salida a Internet
+until dnf install -y sssd sssd-ldap oddjob-mkhomedir authselect openldap-clients; do sleep 10; done
+
+# CA del laboratorio para validar el certificado del servidor LDAP
+cat > /etc/pki/ca-trust/source/anchors/barrilete-ca.crt <<'EOF'
+${ca_cert}
+EOF
+update-ca-trust
+
+cat > /etc/sssd/sssd.conf <<'EOF'
+[sssd]
+services = nss, pam
+domains = barrilete
+
+[domain/barrilete]
+id_provider = ldap
+auth_provider = ldap
+access_provider = simple
+simple_allow_groups = ${allowed_groups}
+ldap_uri = ${ldap_uri}
+ldap_search_base = ${base_dn}
+ldap_tls_cacert = /etc/pki/ca-trust/source/anchors/barrilete-ca.crt
+ldap_tls_reqcert = demand
+cache_credentials = false
+# Si LDAP no responde, reintenta como máximo cada minuto (por defecto llega a 1 hora)
+offline_timeout_max = 60
+EOF
+chmod 600 /etc/sssd/sssd.conf
+
+# Espera a que el servidor LDAP responda (puede arrancar después que este cliente)
+for i in $(seq 1 60); do
+  timeout 3 bash -c "</dev/tcp/${ldap_ip}/636" && break
+  sleep 10
+done
+
+# NSS y PAM usan SSSD; el home se crea en el primer login
+authselect select sssd with-mkhomedir --force
+systemctl enable --now oddjobd sssd
+
+# Contraseña por SSH (la valida LDAP); root nunca entra
+cat > /etc/ssh/sshd_config.d/10-ldap.conf <<'EOF'
+PasswordAuthentication yes
+KbdInteractiveAuthentication yes
+PermitRootLogin no
+EOF
+systemctl restart sshd
+
+# Para pruebas con ldapsearch
+cat >> /etc/openldap/ldap.conf <<'EOF'
+BASE ${base_dn}
+URI ${ldap_uri}
+TLS_CACERT /etc/pki/ca-trust/source/anchors/barrilete-ca.crt
+EOF
