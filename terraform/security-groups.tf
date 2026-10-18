@@ -1,3 +1,7 @@
+# Security Groups. Las reglas van como recursos separados
+# (aws_vpc_security_group_*_rule) para poder sumarlas desde otros archivos
+# sin que Terraform borre las que ya existen.
+
 # ---------------------------------------------------------------------------
 # Bastion: SSH solo desde la IP del administrador
 # ---------------------------------------------------------------------------
@@ -6,22 +10,22 @@ resource "aws_security_group" "bastion" {
   description = "SSH desde la IP del administrador"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description = "SSH administrador"
-    protocol    = "tcp"
-    from_port   = 22
-    to_port     = 22
-    cidr_blocks = [var.admin_cidr]
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = { Name = "${local.name}-bastion-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "bastion_ssh_admin" {
+  security_group_id = aws_security_group.bastion.id
+  description       = "SSH administrador"
+  ip_protocol       = "tcp"
+  from_port         = 22
+  to_port           = 22
+  cidr_ipv4         = var.admin_cidr
+}
+
+resource "aws_vpc_security_group_egress_rule" "bastion_all" {
+  security_group_id = aws_security_group.bastion.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
 
 # ---------------------------------------------------------------------------
@@ -32,30 +36,31 @@ resource "aws_security_group" "sales" {
   description = "Instancias de Ventas"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description     = "SSH desde Bastion"
-    protocol        = "tcp"
-    from_port       = 22
-    to_port         = 22
-    security_groups = [aws_security_group.bastion.id]
-  }
-
-  ingress {
-    description = "ICMP entre instancias de Ventas"
-    protocol    = "icmp"
-    from_port   = -1
-    to_port     = -1
-    self        = true
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = { Name = "${local.name}-sales-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sales_ssh_bastion" {
+  security_group_id            = aws_security_group.sales.id
+  description                  = "SSH desde Bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sales_icmp_self" {
+  security_group_id            = aws_security_group.sales.id
+  description                  = "ICMP entre instancias de Ventas"
+  ip_protocol                  = "icmp"
+  from_port                    = -1
+  to_port                      = -1
+  referenced_security_group_id = aws_security_group.sales.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "sales_all" {
+  security_group_id = aws_security_group.sales.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
 
 # ---------------------------------------------------------------------------
@@ -66,22 +71,22 @@ resource "aws_security_group" "it" {
   description = "Instancias de TI"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description     = "SSH desde Bastion"
-    protocol        = "tcp"
-    from_port       = 22
-    to_port         = 22
-    security_groups = [aws_security_group.bastion.id]
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = { Name = "${local.name}-it-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "it_ssh_bastion" {
+  security_group_id            = aws_security_group.it.id
+  description                  = "SSH desde Bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "it_all" {
+  security_group_id = aws_security_group.it.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
 
 # ---------------------------------------------------------------------------
@@ -93,30 +98,40 @@ resource "aws_security_group" "datacenter" {
   description = "Servidores del Data Center"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    description     = "SSH desde Bastion y TI"
-    protocol        = "tcp"
-    from_port       = 22
-    to_port         = 22
-    security_groups = [aws_security_group.bastion.id, aws_security_group.it.id]
-  }
-
-  ingress {
-    description     = "ICMP desde TI"
-    protocol        = "icmp"
-    from_port       = -1
-    to_port         = -1
-    security_groups = [aws_security_group.it.id]
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = { Name = "${local.name}-datacenter-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "datacenter_ssh_bastion" {
+  security_group_id            = aws_security_group.datacenter.id
+  description                  = "SSH desde Bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "datacenter_ssh_it" {
+  security_group_id            = aws_security_group.datacenter.id
+  description                  = "SSH desde TI"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.it.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "datacenter_icmp_it" {
+  security_group_id            = aws_security_group.datacenter.id
+  description                  = "ICMP desde TI"
+  ip_protocol                  = "icmp"
+  from_port                    = -1
+  to_port                      = -1
+  referenced_security_group_id = aws_security_group.it.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "datacenter_all" {
+  security_group_id = aws_security_group.datacenter.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
 
 # ---------------------------------------------------------------------------
@@ -127,12 +142,11 @@ resource "aws_security_group" "guest" {
   description = "Red de visitas, sin entrada"
   vpc_id      = aws_vpc.main.id
 
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = { Name = "${local.name}-guest-sg" }
+}
+
+resource "aws_vpc_security_group_egress_rule" "guest_all" {
+  security_group_id = aws_security_group.guest.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
