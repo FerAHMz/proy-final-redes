@@ -150,3 +150,21 @@ resource "aws_vpc_security_group_egress_rule" "guest_all" {
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
+
+# ---------------------------------------------------------------------------
+# TI llega a todas las subredes; ninguna subred llega a TI (SG-TI solo acepta
+# SSH desde el Bastion, que es el acceso de administración)
+# ---------------------------------------------------------------------------
+resource "aws_vpc_security_group_ingress_rule" "from_it" {
+  for_each = {
+    bastion    = aws_security_group.bastion.id
+    sales      = aws_security_group.sales.id
+    datacenter = aws_security_group.datacenter.id
+    guest      = aws_security_group.guest.id
+  }
+
+  security_group_id            = each.value
+  description                  = "TI llega a todas las subredes"
+  ip_protocol                  = "-1"
+  referenced_security_group_id = aws_security_group.it.id
+}
