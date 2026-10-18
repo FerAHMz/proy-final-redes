@@ -152,6 +152,87 @@ resource "aws_vpc_security_group_egress_rule" "guest_all" {
 }
 
 # ---------------------------------------------------------------------------
+# RRHH: SSH desde Bastion, ICMP solo entre instancias de RRHH
+# ---------------------------------------------------------------------------
+resource "aws_security_group" "hr" {
+  name        = "${local.name}-hr-sg"
+  description = "Instancias de Recursos Humanos"
+  vpc_id      = aws_vpc.main.id
+
+  tags = { Name = "${local.name}-hr-sg" }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "hr_ssh_bastion" {
+  security_group_id            = aws_security_group.hr.id
+  description                  = "SSH desde Bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "hr_icmp_self" {
+  security_group_id            = aws_security_group.hr.id
+  description                  = "ICMP entre instancias de RRHH"
+  ip_protocol                  = "icmp"
+  from_port                    = -1
+  to_port                      = -1
+  referenced_security_group_id = aws_security_group.hr.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "hr_all" {
+  security_group_id = aws_security_group.hr.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+# ---------------------------------------------------------------------------
+# Intranet (servidor web del Data Center): HTTP desde todas las subredes
+# menos Visitas. No tiene IP pública, así que desde Internet no se llega.
+# ---------------------------------------------------------------------------
+resource "aws_security_group" "web" {
+  name        = "${local.name}-web-sg"
+  description = "Servidor web de la intranet"
+  vpc_id      = aws_vpc.main.id
+
+  tags = { Name = "${local.name}-web-sg" }
+}
+
+# TI tiene acceso total por la regla "from_it"
+resource "aws_vpc_security_group_ingress_rule" "web_http" {
+  for_each = {
+    ventas          = aws_security_group.sales.id
+    rrhh            = aws_security_group.hr.id
+    datacenter      = aws_security_group.web.id
+    datacenter_ldap = aws_security_group.ldap.id
+    bastion         = aws_security_group.bastion.id
+    firewall        = aws_security_group.fw.id
+  }
+
+  security_group_id            = aws_security_group.web.id
+  description                  = "HTTP desde ${each.key}"
+  ip_protocol                  = "tcp"
+  from_port                    = 80
+  to_port                      = 80
+  referenced_security_group_id = each.value
+}
+
+resource "aws_vpc_security_group_ingress_rule" "web_ssh_bastion" {
+  security_group_id            = aws_security_group.web.id
+  description                  = "SSH desde Bastion"
+  ip_protocol                  = "tcp"
+  from_port                    = 22
+  to_port                      = 22
+  referenced_security_group_id = aws_security_group.bastion.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "web_all" {
+  security_group_id = aws_security_group.web.id
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+# ---------------------------------------------------------------------------
 # TI llega a todas las subredes; ninguna subred llega a TI (SG-TI solo acepta
 # SSH desde el Bastion, que es el acceso de administración)
 # ---------------------------------------------------------------------------
@@ -161,6 +242,8 @@ resource "aws_vpc_security_group_ingress_rule" "from_it" {
     sales      = aws_security_group.sales.id
     datacenter = aws_security_group.datacenter.id
     guest      = aws_security_group.guest.id
+    hr         = aws_security_group.hr.id
+    web        = aws_security_group.web.id
   }
 
   security_group_id            = each.value

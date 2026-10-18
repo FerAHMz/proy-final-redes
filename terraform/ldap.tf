@@ -47,6 +47,15 @@ resource "aws_vpc_security_group_ingress_rule" "ldap_ldaps_sales" {
   referenced_security_group_id = aws_security_group.sales.id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "ldap_ldaps_hr" {
+  security_group_id            = aws_security_group.ldap.id
+  description                  = "LDAPS desde RRHH"
+  ip_protocol                  = "tcp"
+  from_port                    = 636
+  to_port                      = 636
+  referenced_security_group_id = aws_security_group.hr.id
+}
+
 resource "aws_vpc_security_group_ingress_rule" "ldap_ssh_bastion" {
   security_group_id            = aws_security_group.ldap.id
   description                  = "SSH desde el Bastion"
