@@ -82,6 +82,30 @@ resource "aws_instance" "datacenter" {
   tags = { Name = format("${local.name}-dc-%02d", count.index + 1) }
 }
 
+resource "aws_instance" "hr" {
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.hr.id
+  private_ip                  = cidrhost(var.hr_subnet_cidr, 4)
+  associate_public_ip_address = false
+  vpc_security_group_ids      = [aws_security_group.hr.id]
+  key_name                    = var.key_name
+  user_data_replace_on_change = true
+
+  # Autenticación SSH contra LDAP: entran RRHH y TI
+  user_data = templatefile("${path.module}/../scripts/sssd-client.sh.tftpl", {
+    ca_cert        = tls_self_signed_cert.ca.cert_pem
+    ldap_uri       = local.ldap_uri
+    ldap_ip        = local.ldap_ip
+    base_dn        = local.ldap_base_dn
+    allowed_groups = "rrhh-users, ti-admins"
+  })
+
+  depends_on = [aws_route_table.private]
+
+  tags = { Name = "${local.name}-hr-01" }
+}
+
 resource "aws_instance" "guest" {
   count = var.create_guest_instance ? 1 : 0
 

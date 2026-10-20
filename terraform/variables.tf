@@ -68,10 +68,12 @@ variable "admin_cidr" {
   }
 }
 
+# t2.micro tiene 1 vCPU: las 9 instancias de la Fase 2 suman 9 vCPU y caben en
+# el límite de 16 vCPU de la cuenta (con t3.micro, de 2 vCPU, serían 18)
 variable "instance_type" {
-  description = "Tipo de instancia EC2 (Free Tier: t3.micro o t2.micro)"
+  description = "Tipo de instancia EC2 (Free Tier)"
   type        = string
-  default     = "t3.micro"
+  default     = "t2.micro"
 }
 
 variable "key_name" {
@@ -84,14 +86,15 @@ variable "datacenter_instance_count" {
   type        = number
   default     = 1
 
+  # dc-01 es el servidor web de la intranet, por eso el mínimo es 1
   validation {
-    condition     = var.datacenter_instance_count >= 0 && var.datacenter_instance_count <= 5
-    error_message = "datacenter_instance_count debe estar entre 0 y 5."
+    condition     = var.datacenter_instance_count >= 1 && var.datacenter_instance_count <= 5
+    error_message = "datacenter_instance_count debe estar entre 1 y 5."
   }
 }
 
 variable "create_guest_instance" {
   description = "Crear una instancia de prueba en la red de Visitas"
   type        = bool
-  default     = false
+  default     = true
 }

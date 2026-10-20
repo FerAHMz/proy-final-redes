@@ -5,7 +5,7 @@ aws_region = "us-east-1"
 admin_cidr = "203.0.113.10/32"
 key_name   = "nombre-keypair"
 
-instance_type = "t3.micro"
+instance_type = "t2.micro"
 
 datacenter_instance_count = 1
-create_guest_instance     = false
+create_guest_instance     = true
