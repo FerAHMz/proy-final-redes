@@ -76,7 +76,7 @@ resource "aws_instance" "datacenter" {
   subnet_id                   = aws_subnet.datacenter.id
   private_ip                  = cidrhost(var.datacenter_subnet_cidr, 4 + count.index)
   associate_public_ip_address = false
-  vpc_security_group_ids      = [aws_security_group.datacenter.id]
+  vpc_security_group_ids      = [aws_security_group.web.id]
   key_name                    = var.key_name
 
   tags = { Name = format("${local.name}-dc-%02d", count.index + 1) }
