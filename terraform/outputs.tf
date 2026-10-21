@@ -92,3 +92,11 @@ output "ldap_user_passwords" {
   value       = { for k, p in random_password.ldap_user : k => p.result }
   sensitive   = true
 }
+
+output "dns_zone_id" {
+  value = aws_route53_zone.private.zone_id
+}
+
+output "intranet_url" {
+  value = "http://${aws_route53_record.rrhh.name}"
+}
