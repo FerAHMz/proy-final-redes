@@ -1,6 +1,9 @@
 # Security Groups. Las reglas van como recursos separados
 # (aws_vpc_security_group_*_rule) para poder sumarlas desde otros archivos
 # sin que Terraform borre las que ya existen.
+#
+# Hardening: cada SG solo abre los puertos que usa su servicio. Todo lo que no
+# tiene una regla de entrada queda bloqueado (los SG solo permiten).
 
 # ---------------------------------------------------------------------------
 # Bastion: SSH solo desde la IP del administrador
@@ -85,51 +88,6 @@ resource "aws_vpc_security_group_ingress_rule" "it_ssh_bastion" {
 
 resource "aws_vpc_security_group_egress_rule" "it_all" {
   security_group_id = aws_security_group.it.id
-  ip_protocol       = "-1"
-  cidr_ipv4         = "0.0.0.0/0"
-}
-
-# ---------------------------------------------------------------------------
-# Data Center: SSH desde Bastion y TI, ICMP solo desde TI
-# Ventas y Visitas no tienen ninguna regla, por lo que quedan bloqueadas
-# ---------------------------------------------------------------------------
-resource "aws_security_group" "datacenter" {
-  name        = "${local.name}-datacenter-sg"
-  description = "Servidores del Data Center"
-  vpc_id      = aws_vpc.main.id
-
-  tags = { Name = "${local.name}-datacenter-sg" }
-}
-
-resource "aws_vpc_security_group_ingress_rule" "datacenter_ssh_bastion" {
-  security_group_id            = aws_security_group.datacenter.id
-  description                  = "SSH desde Bastion"
-  ip_protocol                  = "tcp"
-  from_port                    = 22
-  to_port                      = 22
-  referenced_security_group_id = aws_security_group.bastion.id
-}
-
-resource "aws_vpc_security_group_ingress_rule" "datacenter_ssh_it" {
-  security_group_id            = aws_security_group.datacenter.id
-  description                  = "SSH desde TI"
-  ip_protocol                  = "tcp"
-  from_port                    = 22
-  to_port                      = 22
-  referenced_security_group_id = aws_security_group.it.id
-}
-
-resource "aws_vpc_security_group_ingress_rule" "datacenter_icmp_it" {
-  security_group_id            = aws_security_group.datacenter.id
-  description                  = "ICMP desde TI"
-  ip_protocol                  = "icmp"
-  from_port                    = -1
-  to_port                      = -1
-  referenced_security_group_id = aws_security_group.it.id
-}
-
-resource "aws_vpc_security_group_egress_rule" "datacenter_all" {
-  security_group_id = aws_security_group.datacenter.id
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
@@ -238,12 +196,11 @@ resource "aws_vpc_security_group_egress_rule" "web_all" {
 # ---------------------------------------------------------------------------
 resource "aws_vpc_security_group_ingress_rule" "from_it" {
   for_each = {
-    bastion    = aws_security_group.bastion.id
-    sales      = aws_security_group.sales.id
-    datacenter = aws_security_group.datacenter.id
-    guest      = aws_security_group.guest.id
-    hr         = aws_security_group.hr.id
-    web        = aws_security_group.web.id
+    bastion = aws_security_group.bastion.id
+    sales   = aws_security_group.sales.id
+    guest   = aws_security_group.guest.id
+    hr      = aws_security_group.hr.id
+    web     = aws_security_group.web.id
   }
 
   security_group_id            = each.value
