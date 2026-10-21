@@ -78,6 +78,18 @@ resource "aws_instance" "datacenter" {
   associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.web.id]
   key_name                    = var.key_name
+  user_data_replace_on_change = true
+
+  # Intranet de RRHH con Nginx; publica todo lo que hay en web/
+  user_data = templatefile("${path.module}/../scripts/web.sh.tftpl", {
+    server_name = "rrhh.barrilete.dev"
+    web_files = {
+      for f in fileset("${path.module}/../web", "*") :
+      f => filebase64("${path.module}/../web/${f}")
+    }
+  })
+
+  depends_on = [aws_route_table.private]
 
   tags = { Name = format("${local.name}-dc-%02d", count.index + 1) }
 }
