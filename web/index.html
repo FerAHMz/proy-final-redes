@@ -2,10 +2,83 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Barrilete People</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="logo.webp">
 </head>
 <body>
-  <h1>Barrilete People</h1>
-  <p>Sistema de Recursos Humanos de Barrilete Ventures (página provisional).</p>
+  <header class="barra">
+    <div class="marca">
+      <img class="logo" src="logo.webp" alt="Logo de Barrilete">
+      <div>
+        <strong>Barrilete People</strong>
+        <span>Recursos Humanos · Barrilete Ventures</span>
+      </div>
+    </div>
+    <nav>
+      <a href="#inicio">Inicio</a>
+      <a href="#avisos">Avisos</a>
+      <a href="#areas">Áreas</a>
+      <a href="#politicas">Políticas</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="inicio" class="portada">
+      <h1>Bienvenido a la intranet de Recursos Humanos</h1>
+      <p>Información interna para todo el equipo de Barrilete Ventures. Este sitio solo está disponible dentro de la red de la empresa.</p>
+    </section>
+
+    <section id="avisos">
+      <h2>Avisos</h2>
+      <div class="tarjetas">
+        <article class="tarjeta">
+          <span class="fecha">Noviembre</span>
+          <h3>Lanzamiento de barrilete.dev</h3>
+          <p>El sitio público de la empresa sale a principios de mes. Ventas coordinará la comunicación con emprendedores e inversionistas.</p>
+        </article>
+        <article class="tarjeta">
+          <span class="fecha">Cada viernes</span>
+          <h3>Demo day interno</h3>
+          <p>Las startups del portafolio presentan sus avances al equipo. Sala principal, 4:00 p. m.</p>
+        </article>
+        <article class="tarjeta">
+          <span class="fecha">Recordatorio</span>
+          <h3>Acceso a los sistemas</h3>
+          <p>Las cuentas se administran en el directorio de la empresa. Si cambias de área, TI actualiza tu grupo de acceso.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="areas">
+      <h2>Áreas</h2>
+      <table>
+        <thead>
+          <tr><th>Área</th><th>Qué hace</th><th>Equipo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ventas</td><td>Contacto con emprendedores e inversionistas y seguimiento de oportunidades</td><td>25 personas</td></tr>
+          <tr><td>Recursos Humanos</td><td>Contratación, planilla, capacitación y clima laboral</td><td>—</td></tr>
+          <tr><td>TI</td><td>Soporte, infraestructura en la nube y seguridad</td><td>15 personas</td></tr>
+          <tr><td>Data Center</td><td>Servidores del sitio web, la intranet y el directorio de usuarios</td><td>5 servidores</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="politicas">
+      <h2>Políticas</h2>
+      <ul class="lista">
+        <li><strong>Horario:</strong> lunes a viernes de 8:00 a 17:00, con una hora de almuerzo.</li>
+        <li><strong>Vacaciones:</strong> se solicitan con dos semanas de anticipación a tu jefe inmediato.</li>
+        <li><strong>Visitas:</strong> los invitados usan la red de visitas, que no tiene acceso a los sistemas internos.</li>
+        <li><strong>Contraseñas:</strong> son personales; nunca las compartas por correo ni por chat.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    Barrilete Ventures · Intranet de uso interno · rrhh.barrilete.dev
+  </footer>
 </body>
 </html>
