@@ -1,0 +1,29 @@
+# Lab 7 – config de SSH para entrar a TI desde la laptop.
+#
+# Cómo usarlo:
+#   1. Copiá estos bloques a ~/.ssh/config (Windows: C:\Users\<tu-usuario>\.ssh\config)
+#   2. Cambiá <BASTION_IP> por: terraform -chdir=terraform output -raw bastion_public_ip
+#   3. Ajustá IdentityFile a donde guardaste la llave del Key Pair barrillete-key
+#
+# Después basta con: ssh bastion | ssh it-01 | ssh it-02
+
+Host bastion
+    HostName <BASTION_IP>
+    User ec2-user
+    IdentityFile ~/.ssh/barrillete-key.pem
+    IdentitiesOnly yes
+
+# it-01 y it-02 no tienen IP pública: se entra saltando por el Bastion
+Host it-01
+    HostName 192.168.10.138
+    User ec2-user
+    IdentityFile ~/.ssh/barrillete-key.pem
+    IdentitiesOnly yes
+    ProxyJump bastion
+
+Host it-02
+    HostName 192.168.10.139
+    User ec2-user
+    IdentityFile ~/.ssh/barrillete-key.pem
+    IdentitiesOnly yes
+    ProxyJump bastion
