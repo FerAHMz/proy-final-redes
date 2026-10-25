@@ -167,6 +167,55 @@ Un equipo de soporte o de DevOps administra varios paneles internos en la VPC de
 
 *Justificación:* los paneles siguen sin exponerse a Internet, el acceso pasa por un solo punto controlado (llaves, logs y `admin_cidr` del Bastion), no hay que instalar ni mantener un servidor VPN, y quitarle el acceso a alguien es borrar su llave. Además, con socks5h los nombres internos no se filtran al DNS de la red pública donde esté el técnico.
 
+## Preguntas del enunciado
+
+### ¿En qué capa funciona SOCKS?
+
+**En la capa de sesión, la capa 5 del modelo OSI.** Va encima de TCP/UDP (capa 4) y no le importa qué protocolo de aplicación pasa por adentro.
+
+Por qué lo ubicamos ahí:
+
+- **Usa la capa de transporte, no la reemplaza.** El cliente abre una conexión TCP normal con el proxy, y el proxy abre otra TCP (o un relay UDP) hacia el destino. SOCKS vive arriba de esas conexiones.
+- **No es capa 3.** No enruta paquetes IP ni maneja ICMP. La RFC 1928 lo dice explícito: no da servicios de gateway de red como reenviar ICMP. Por eso un `ping` no pasa por nuestro túnel, pero cualquier conexión TCP sí.
+- **Tampoco es capa 7.** Después del saludo, el proxy solo copia bytes. Le da igual si adentro va HTTP, SSH, SMTP o TLS. Por eso con el mismo proxy navegamos en HTTP y en HTTPS, y podríamos hacer `ssh -o ProxyCommand="ncat --proxy-type socks5 --proxy 127.0.0.1:1080 %h %p" ...` sin cambiar nada.
+- **Lo que sí hace es manejar la sesión**, que es justo el trabajo de la capa 5: negocia el método de autenticación (ninguno, usuario/contraseña de la RFC 1929 o GSSAPI), recibe el pedido de conexión (`CONNECT`, `BIND` o `UDP ASSOCIATE`), la establece, la mantiene mientras dura y la cierra.
+
+La propia RFC 1928 lo describe como, conceptualmente, una "shim-layer" entre la capa de aplicación y la de transporte. En el modelo OSI, lo que está justo entre esas dos es la capa de sesión.
+
+Un detalle para no confundirse: `man ssh` le dice a `-D` "dynamic application-level port forwarding". Eso habla de *dónde lo implementa ssh* (en un programa de usuario, no en el kernel), no de la capa del protocolo SOCKS. Y en el modelo TCP/IP, que no tiene capa de sesión, SOCKS quedaría dentro de la capa de aplicación del host.
+
+Otro detalle: el SOCKS de OpenSSH solo implementa `CONNECT`, o sea solo TCP. `UDP ASSOCIATE` existe en SOCKS5, pero ssh no lo soporta. Por eso el DNS de nuestro túnel no viaja como paquete UDP al puerto 53: viaja como nombre dentro del `CONNECT` (socks5h) y lo resuelve el Bastion.
+
+### ¿En qué se diferencia un proxy SOCKS de un proxy HTTP?
+
+| | Proxy SOCKS (SOCKS5) | Proxy HTTP |
+|---|---|---|
+| Capa OSI | 5, sesión | 7, aplicación |
+| Protocolos que lleva | Cualquier cosa sobre TCP, y UDP con `UDP ASSOCIATE` | HTTP. Otros protocolos solo encapsulados con `CONNECT`, que la mayoría de proxies limita al 443 |
+| ¿Interpreta el tráfico? | No. Después del saludo solo copia bytes, sin leer ni modificar | Sí. Lee método, URL y cabeceras, y puede reescribirlas o agregar `Via` y `X-Forwarded-For` |
+| Cómo se pide el destino | Mensaje binario propio: `CONNECT` + tipo de dirección (IPv4, nombre o IPv6) + puerto | Con HTTP: la URL completa en la línea de petición (`GET http://host/ruta HTTP/1.1`) o `CONNECT host:443` para un túnel |
+| `CONNECT` | Es el comando base (`0x01`). Cualquier conexión TCP es un `CONNECT` | Es un método especial (RFC 9110 §9.3.6) que convierte la conexión en un túnel TCP ciego, casi siempre para HTTPS. Solo ahí se comporta como SOCKS |
+| Caché | No puede: no sabe qué es una respuesta | Sí puede guardar respuestas y servirlas de nuevo (RFC 9111) |
+| Filtrado | Solo por IP, puerto o nombre de destino | Por URL, cabeceras, tipo de contenido, palabras, etc. Con HTTPS por `CONNECT` solo ve el nombre del host, salvo que haga inspección TLS |
+| DNS | Configurable: lo resuelve el cliente (socks5) o el proxy (socks5h). SOCKS4 solo acepta IPs, SOCKS4a agregó nombres | Siempre lo resuelve el proxy, porque recibe el nombre en la URL o en el `CONNECT` |
+| Autenticación | Negociada al inicio: ninguna, usuario/contraseña (RFC 1929) o GSSAPI | Cabecera `Proxy-Authorization`; si falta, el proxy responde `407 Proxy Authentication Required` |
+| Soporte en clientes | La app tiene que hablar SOCKS (navegadores, curl, ncat, ssh con `ProxyCommand`) | Casi todo: navegadores, `http_proxy`/`https_proxy`, gestores de paquetes |
+| En nuestro lab | `ssh -D 1080 bastion`: con el mismo proxy llegamos a la intranet (HTTP) y a Internet (HTTPS) | No lo usamos. Haría falta instalar algo como Squid en el Bastion y abrirle un puerto |
+
+En corto: un proxy HTTP **entiende** lo que pasa por él y por eso puede cachear, filtrar y reescribir, pero sirve casi solo para web. SOCKS **no entiende** nada de lo que lleva, y por eso sirve para cualquier protocolo TCP, pero no puede cachear ni filtrar contenido.
+
+### Fuentes
+
+- RFC 1928, *SOCKS Protocol Version 5*: modelo de "shim-layer", comandos `CONNECT`/`BIND`/`UDP ASSOCIATE`, campo `ATYP` y aclaración de que no reenvía ICMP. <https://www.rfc-editor.org/rfc/rfc1928>
+- RFC 1929, *Username/Password Authentication for SOCKS V5*. <https://www.rfc-editor.org/rfc/rfc1929>
+- RFC 9110, *HTTP Semantics*: método `CONNECT` (§9.3.6) y código `407` (§15.5.8). <https://www.rfc-editor.org/rfc/rfc9110>
+- RFC 9111, *HTTP Caching*. <https://www.rfc-editor.org/rfc/rfc9111>
+- RFC 9112, *HTTP/1.1*: petición en forma absoluta hacia un proxy (§3.2.2). <https://www.rfc-editor.org/rfc/rfc9112>
+- `man ssh` (opción `-D`: SOCKS4 y SOCKS5, ssh actúa como servidor SOCKS), `man ssh_config` (`DynamicForward`, `GatewayPorts`) y `man sshd_config` (`AllowTcpForwarding`). <https://man.openbsd.org/ssh>
+- `man curl`: `--socks5` y `--socks5-hostname`. <https://curl.se/docs/manpage.html>
+- AWS, *Set up an SSH tunnel to the primary node using dynamic port forwarding* (caso académico). <https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-ssh-tunnel.html>
+- ISO/IEC 7498-1, modelo de referencia OSI (funciones de la capa de sesión).
+
 ## Capturas (en `evidencias/lab7/`)
 
 | Archivo | Qué se ve |
