@@ -86,6 +86,22 @@ resource "aws_vpc_security_group_ingress_rule" "it_ssh_bastion" {
   referenced_security_group_id = aws_security_group.bastion.id
 }
 
+# Lab 7: entre instancias de TI solo SSH (multi-hop) y TCP 4444 (ncat).
+# Como referencia al propio SG, el resto de subredes sigue sin llegar a TI.
+resource "aws_vpc_security_group_ingress_rule" "it_self" {
+  for_each = {
+    ssh  = 22
+    ncat = 4444
+  }
+
+  security_group_id            = aws_security_group.it.id
+  description                  = "${each.key} entre instancias de TI"
+  ip_protocol                  = "tcp"
+  from_port                    = each.value
+  to_port                      = each.value
+  referenced_security_group_id = aws_security_group.it.id
+}
+
 resource "aws_vpc_security_group_egress_rule" "it_all" {
   security_group_id = aws_security_group.it.id
   ip_protocol       = "-1"
