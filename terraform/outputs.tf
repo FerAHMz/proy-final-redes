@@ -58,6 +58,10 @@ output "it_01_private_ip" {
   value = aws_instance.it.private_ip
 }
 
+output "it_02_private_ip" {
+  value = aws_instance.it_02.private_ip
+}
+
 output "hr_01_private_ip" {
   value = aws_instance.hr.private_ip
 }

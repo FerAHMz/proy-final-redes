@@ -68,6 +68,22 @@ resource "aws_instance" "it" {
   tags = { Name = "${local.name}-it-01" }
 }
 
+# Segunda instancia de TI (Lab 7: multi-hop y ncat entre it-01 e it-02).
+# Va aparte y no como for_each sobre "it" para no recrear it-01.
+resource "aws_instance" "it_02" {
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.it.id
+  private_ip                  = cidrhost(var.it_subnet_cidr, 11)
+  associate_public_ip_address = false
+  vpc_security_group_ids      = [aws_security_group.it.id]
+  key_name                    = var.key_name
+
+  depends_on = [aws_route_table.private]
+
+  tags = { Name = "${local.name}-it-02" }
+}
+
 resource "aws_instance" "datacenter" {
   count = var.datacenter_instance_count
 
