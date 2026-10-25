@@ -20,6 +20,12 @@ OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new 
 PETICION='GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n'
 
 ok=0; fallas=0; PIDS=()
+
+# Compatible con Git Bash (bash 5) y con el bash 3.2 de macOS: sin índices
+# negativos (${PIDS[-1]}) ni recorrer un arreglo vacío con set -u.
+ultimo_pid() {
+  if [ ${#PIDS[@]} -gt 0 ]; then echo "${PIDS[$((${#PIDS[@]} - 1))]}"; fi
+}
 TMP="$(mktemp -d)"
 
 pasa()  { echo "  OK    $1"; ok=$((ok + 1)); }
@@ -40,7 +46,7 @@ matar() {
   wait "$pid" 2>/dev/null
 }
 limpiar() {
-  for pid in "${PIDS[@]}"; do matar "$pid"; done
+  for pid in ${PIDS[@]+"${PIDS[@]}"}; do matar "$pid"; done
   PIDS=()
 }
 trap 'limpiar; rm -rf "$TMP"' EXIT
@@ -48,7 +54,7 @@ trap 'limpiar; rm -rf "$TMP"' EXIT
 # Espera hasta 15 s a que algo escuche en 127.0.0.1:$1. Se corta antes si el
 # proceso que debía abrirlo ($2, el último en segundo plano) ya murió.
 esperar_puerto() {
-  local fin=$((SECONDS + 15)) pid=${2:-${PIDS[-1]:-}}
+  local fin=$((SECONDS + 15)) pid=${2:-$(ultimo_pid)}
   while [ $SECONDS -lt $fin ]; do
     [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null && return 1
     (echo >"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0
@@ -141,7 +147,8 @@ probar "ssh -J bastion,it-01: it-02 ve la conexión desde it-01" bash -c "ssh ${
 # ---------------------------------------------------------------------------
 seccion "3.3 ncat"
 # Chat local: un mensaje de una terminal a otra por el 4444 de la laptop
-ncat -l 127.0.0.1 $PUERTO > "$TMP/chat-local.txt" 2>/dev/null &
+# -k: la conexión de prueba de esperar_puerto no cierra al servidor
+ncat -l -k 127.0.0.1 $PUERTO > "$TMP/chat-local.txt" 2>/dev/null &
 PIDS+=($!)
 if esperar_puerto $PUERTO; then
   echo "hola chat local" | ncat --send-only 127.0.0.1 $PUERTO >/dev/null 2>&1
@@ -157,7 +164,7 @@ ssh "${OPTS[@]}" it-02 "timeout 20 ncat -l $PUERTO > /tmp/lab7-chat.txt" &
 PIDS+=($!)
 sleep 3
 en it-01 "echo 'hola desde it-01' | ncat --send-only $IT02 $PUERTO" >/dev/null 2>&1
-wait "${PIDS[-1]}" 2>/dev/null; PIDS=()
+wait "$(ultimo_pid)" 2>/dev/null; PIDS=()
 probar "chat it-01 → it-02 por el 4444" bash -c "ssh ${OPTS[*]} it-02 'cat /tmp/lab7-chat.txt' | grep -q 'hola desde it-01'"
 en it-02 'rm -f /tmp/lab7-chat.txt' >/dev/null 2>&1
 
@@ -173,7 +180,7 @@ ssh "${OPTS[@]}" it-02 "timeout 20 ncat -l $PUERTO > /tmp/lab7-recibido.txt" &
 PIDS+=($!)
 sleep 3
 en it-01 "ncat --send-only $IT02 $PUERTO < /tmp/lab7-prueba.txt" >/dev/null 2>&1
-wait "${PIDS[-1]}" 2>/dev/null; PIDS=()
+wait "$(ultimo_pid)" 2>/dev/null; PIDS=()
 h1=$(en it-01 'sha256sum /tmp/lab7-prueba.txt' 2>/dev/null | cut -d' ' -f1)
 h2=$(en it-02 'sha256sum /tmp/lab7-recibido.txt' 2>/dev/null | cut -d' ' -f1)
 if [ -n "$h1" ] && [ "$h1" = "$h2" ]; then pasa "transferencia it-01 → it-02 con sha256 igual"; else falla "transferencia it-01 → it-02 con sha256 igual"; fi
