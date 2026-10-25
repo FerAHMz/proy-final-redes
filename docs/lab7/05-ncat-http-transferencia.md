@@ -234,7 +234,7 @@ Borra los dos `.txt` y revisa que ya nadie esté escuchando en el 4444.
 ## Hardening
 
 - Las peticiones HTTP y HTTPS salen por el 80 y el 443, que el firewall ya dejaba salir. No abrimos nada nuevo.
-- La transferencia usa solo el TCP 4444 entre it-01 e it-02, con la regla `it_self` del Bloque A. Desde Ventas no se llega (ver la prueba de [04-multihop-chat.md](04-multihop-chat.md)).
+- La transferencia usa solo el TCP 4444 entre it-01 e it-02, con la regla `it_self` del SG de TI. Desde Ventas no se llega (ver la prueba de [04-multihop-chat.md](04-multihop-chat.md)).
 - ncat solo escucha mientras dura la prueba. Al terminar, `limpiar` confirma que el 4444 quedó cerrado.
 
 ## Fuentes
