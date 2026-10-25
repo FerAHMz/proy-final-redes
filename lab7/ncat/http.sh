@@ -9,20 +9,26 @@
 # fin de las cabeceras. Host es obligatorio en HTTP/1.1 y Connection: close
 # hace que el servidor cierre al terminar, así ncat sale solo.
 #
+# --no-shutdown: por defecto, cuando printf termina, ncat cierra su lado de
+# escritura (half-close) aunque la respuesta todavía no llegue. El servidor de
+# example.org (Cloudflare) corta la conexión sin responder si el cliente cierra
+# antes, así que la salida quedaba vacía. Con --no-shutdown ncat espera la
+# respuesta y sale cuando el servidor cierra (por el Connection: close).
+#
 # Uso:
 #   ./lab7/ncat/http.sh          # desde la laptop
 #   ./lab7/ncat/http.sh it-01    # desde it-01 (sale por el firewall, que deja el 80)
 #
 # A mano, sin el script:
-#   printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat example.org 80
+#   printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --no-shutdown example.org 80
 set -euo pipefail
 
 PETICION='GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n'
 
 if [ -n "${1:-}" ]; then
   echo "== GET http://example.org/ desde $1"
-  ssh "$1" "printf '$PETICION' | ncat example.org 80"
+  ssh "$1" "printf '$PETICION' | ncat --no-shutdown example.org 80"
 else
   echo "== GET http://example.org/ desde $(hostname)"
-  printf "$PETICION" | ncat example.org 80
+  printf "$PETICION" | ncat --no-shutdown example.org 80
 fi

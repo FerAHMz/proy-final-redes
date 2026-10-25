@@ -10,13 +10,19 @@
 # además comprueba que el certificado sea válido para example.org (opción
 # "verificar").
 #
+# --no-shutdown: por defecto, cuando printf termina, ncat cierra su lado de
+# escritura (half-close) aunque la respuesta todavía no llegue. El servidor de
+# example.org (Cloudflare) corta la conexión sin responder si el cliente cierra
+# antes, así que la salida quedaba vacía. Con --no-shutdown ncat espera la
+# respuesta y sale cuando el servidor cierra (por el Connection: close).
+#
 # Uso:
 #   ./lab7/ncat/https.sh                # desde la laptop
 #   ./lab7/ncat/https.sh it-01          # desde it-01 (el firewall deja el 443)
 #   ./lab7/ncat/https.sh verificar      # igual, pero validando el certificado
 #
 # A mano, sin el script:
-#   printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --ssl example.org 443
+#   printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --no-shutdown --ssl example.org 443
 set -euo pipefail
 
 PETICION='GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n'
@@ -24,15 +30,15 @@ PETICION='GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n'
 case "${1:-}" in
   "")
     echo "== GET https://example.org/ desde $(hostname)"
-    printf "$PETICION" | ncat --ssl example.org 443
+    printf "$PETICION" | ncat --no-shutdown --ssl example.org 443
     ;;
   verificar)
     echo "== GET https://example.org/ desde $(hostname), validando el certificado"
     # -v muestra la conexión SSL y la huella del certificado del servidor
-    printf "$PETICION" | ncat -v --ssl --ssl-verify example.org 443
+    printf "$PETICION" | ncat -v --no-shutdown --ssl --ssl-verify example.org 443
     ;;
   *)
     echo "== GET https://example.org/ desde $1"
-    ssh "$1" "printf '$PETICION' | ncat --ssl example.org 443"
+    ssh "$1" "printf '$PETICION' | ncat --no-shutdown --ssl example.org 443"
     ;;
 esac

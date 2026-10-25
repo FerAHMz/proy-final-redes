@@ -161,11 +161,11 @@ wait "${PIDS[-1]}" 2>/dev/null; PIDS=()
 probar "chat it-01 → it-02 por el 4444" bash -c "ssh ${OPTS[*]} it-02 'cat /tmp/lab7-chat.txt' | grep -q 'hola desde it-01'"
 en it-02 'rm -f /tmp/lab7-chat.txt' >/dev/null 2>&1
 
-# HTTP y HTTPS desde la laptop y desde it-01
-probar "HTTP a example.org desde la laptop" bash -c "printf '$PETICION' | ncat example.org 80 | grep -q 'HTTP/1.1 200'"
-probar "HTTPS a example.org desde la laptop" bash -c "printf '$PETICION' | ncat --ssl example.org 443 | grep -q 'Example Domain'"
-probar "HTTP a example.org desde it-01" bash -c "ssh ${OPTS[*]} it-01 \"printf '$PETICION' | ncat example.org 80\" | grep -q 'HTTP/1.1 200'"
-probar "HTTPS a example.org desde it-01" bash -c "ssh ${OPTS[*]} it-01 \"printf '$PETICION' | ncat --ssl example.org 443\" | grep -q 'Example Domain'"
+# HTTP y HTTPS desde la laptop y desde it-01 (--no-shutdown: ver lab7/ncat/http.sh)
+probar "HTTP a example.org desde la laptop" bash -c "printf '$PETICION' | ncat --no-shutdown example.org 80 | grep -q 'HTTP/1.1 200'"
+probar "HTTPS a example.org desde la laptop" bash -c "printf '$PETICION' | ncat --no-shutdown --ssl example.org 443 | grep -q 'Example Domain'"
+probar "HTTP a example.org desde it-01" bash -c "ssh ${OPTS[*]} it-01 \"printf '$PETICION' | ncat --no-shutdown example.org 80\" | grep -q 'HTTP/1.1 200'"
+probar "HTTPS a example.org desde it-01" bash -c "ssh ${OPTS[*]} it-01 \"printf '$PETICION' | ncat --no-shutdown --ssl example.org 443\" | grep -q 'Example Domain'"
 
 # Transferencia de un .txt con verificación sha256
 en it-01 "seq 1 500 | sed 's/^/linea /' > /tmp/lab7-prueba.txt" >/dev/null 2>&1

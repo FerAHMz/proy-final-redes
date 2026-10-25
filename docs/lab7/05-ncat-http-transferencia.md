@@ -35,11 +35,13 @@ La petición tiene tres líneas y una vacía al final:
 
 Cada línea termina en `\r\n` (CRLF), como pide la RFC 9112. Por eso usamos `printf` y no `echo`.
 
+Además usamos `ncat --no-shutdown`. Por defecto, cuando `printf` termina de escribir, ncat cierra su lado de la conexión (*half-close*) sin esperar la respuesta. El servidor de example.org (Cloudflare) interpreta ese cierre como que el cliente se fue y corta sin responder, así que la salida queda vacía. Con `--no-shutdown` ncat mantiene la conexión abierta hasta que llega la respuesta y sale solo cuando el servidor cierra gracias al `Connection: close`.
+
 ### Comandos
 
 ```bash
 ./lab7/ncat/http.sh
-# equivale a: printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat example.org 80
+# equivale a: printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --no-shutdown example.org 80
 ```
 
 Salida esperada (las fechas, `Age` y `CF-RAY` cambian cada vez):
@@ -105,7 +107,7 @@ Si le mandamos la petición en texto plano al 443 (`ncat example.org 443`, sin `
 
 ```bash
 ./lab7/ncat/https.sh
-# equivale a: printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --ssl example.org 443
+# equivale a: printf 'GET / HTTP/1.1\r\nHost: example.org\r\nConnection: close\r\n\r\n' | ncat --no-shutdown --ssl example.org 443
 ```
 
 La salida es la misma que con HTTP (`HTTP/1.1 200 OK`, cabeceras, `<title>Example Domain</title>`). Eso tiene sentido: TLS cifra el transporte, pero lo que va adentro sigue siendo el mismo HTTP.
@@ -122,7 +124,7 @@ Desde it-01, para ver que el firewall deja salir el 443:
 
 ```bash
 ./lab7/ncat/https.sh verificar
-# equivale a: printf '...' | ncat -v --ssl --ssl-verify example.org 443
+# equivale a: printf '...' | ncat -v --no-shutdown --ssl --ssl-verify example.org 443
 ```
 
 Con `-v`, antes de la respuesta salen líneas como estas:
